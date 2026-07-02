@@ -49,6 +49,84 @@ Only deterministic microsecond protocol execution is supported.
 
 # 3. Design Philosophy
 
+# 3.1 Design Invariants
+
+The following rules define the architecture and shall not be violated.
+
+## I1. Single Active Transaction
+
+At most one protocol transaction may be active.
+
+Reason
+
+Protocols supported by this framework are inherently sequential.
+This simplifies timing, testing and future DMA migration.
+
+---
+
+## I2. Single Pending Callback
+
+Executor manages at most one pending callback.
+
+Reason
+
+Each callback schedules the next callback.
+
+This avoids event queues and guarantees deterministic memory usage.
+
+---
+
+## I3. Executor is Protocol Independent
+
+Executor shall never know
+
+- GPIO
+- SWI
+- MAX17215
+- protocol semantics
+
+---
+
+## I4. Timer Backend is Hardware Specific
+
+Timer Backend is the only module allowed to access
+
+TIM12
+NVIC
+CMSIS timer registers
+
+---
+
+## I5. Protocol FSM Owns Timing
+
+Only the protocol FSM decides
+
+- next deadline
+- GPIO action
+- state transition
+
+---
+
+## I6. No Busy Waiting
+
+No protocol implementation shall delay execution.
+
+Timing is always interrupt driven.
+
+---
+
+## I7. No Dynamic Memory
+
+The framework shall never allocate memory dynamically.
+
+---
+
+## I8. Callbacks Execute to Completion
+
+Callbacks shall never block,
+sleep,
+or wait for external events.
+
 The framework follows one simple rule:
 
 > The timer executes callbacks at deterministic timestamps.
@@ -108,10 +186,11 @@ SWI FSM
       owns
       ▼
 Executor
-      │
-      uses
-      ▼
-Timer Backend (singleton)
+
+Timer Backend
+
+Singleton
+owned by BSP
 
 4.2. State Machine Diagrams
 
@@ -150,7 +229,7 @@ Sample
 
 # 5. Module Responsibilities
 
-## Executor
+## MicroExecutor
 
 Responsible for
 
@@ -158,7 +237,7 @@ Responsible for
 - callback execution
 - timer arming
 
-Executor SHALL NOT
+MicroExecutor SHALL NOT
 
 - know GPIO
 - know protocols
@@ -238,6 +317,25 @@ Execute at T + 10us
 
 This eliminates accumulated timing drift.
 
+
+Timing accuracy
+
+Timer resolution
+
+<= 1 us
+
+Jitter
+
+<= 1 us
+
+ISR execution
+
+< 3 us
+
+Protocol callback
+
+< 5 us
+
 ---
 
 # 7. Execution Model
@@ -282,7 +380,27 @@ The protocol layer never knows the MCU.
 
 ---
 
-# 9. Memory Policy
+# 9 Concurrency Model
+
+The framework executes in exactly two contexts.
+
+Thread Context
+
+- Public APIs
+- Blocking waits
+- Driver initialization
+
+Interrupt Context
+
+- Executor callback
+- Timer backend
+
+Shared data shall be protected using
+minimal critical sections.
+
+Callbacks never preempt each other.
+
+# 10. Memory Policy
 
 Dynamic allocation is forbidden.
 
@@ -296,7 +414,7 @@ Only.
 
 ---
 
-# 10. Interrupt Policy
+# 11. Interrupt Policy
 
 Interrupt handlers must be minimal.
 
@@ -316,7 +434,7 @@ Forbidden
 
 ---
 
-# 11. Blocking API
+# 12. Blocking API
 
 Public APIs may block.
 
@@ -348,7 +466,7 @@ return
 
 ---
 
-# 12. Error Handling
+# 13. Error Handling
 
 Every public function returns status.
 
@@ -364,9 +482,29 @@ BUS_ERROR
 
 INVALID_PARAMETER
 
+a common status type for error model 
+
+typedef enum
+{
+    STATUS_OK = 0,
+
+    STATUS_BUSY,
+
+    STATUS_TIMEOUT,
+
+    STATUS_CRC_ERROR,
+
+    STATUS_BUS_ERROR,
+
+    STATUS_PARAMETER_ERROR,
+
+    STATUS_INTERNAL_ERROR
+
+} Status;
+Every module uses this type.
 ---
 
-# 13. Unit Testing
+# 14. Unit Testing
 
 Every module except Timer Backend shall compile
 on Windows.
@@ -378,7 +516,7 @@ on STM32 and Windows.
 
 ---
 
-# 14. DMA Compatibility
+# 15. DMA Compatibility
 
 The architecture is designed so that the timer backend
 may later be replaced by
@@ -397,7 +535,7 @@ without changing
 
 ---
 
-# 15. Coding Rules
+# 16. Coding Rules
 
 C99
 
@@ -419,7 +557,15 @@ No hidden side effects
 
 ---
 
-# 16. Future Extensions
+# 17. Portability Rules
+STM32 specific code shall exist only inside
+
+Drivers/BSP/
+
+Everything else must compile on Windows.
+---
+
+# 18. Future Extensions
 
 The framework is intended to support
 
@@ -433,7 +579,38 @@ without modification of the executor.
 
 ---
 
-# 17. Current Status
+# 19. State Ownership
+State belongs to the module that owns it.
+
+Example
+
+MAX17215 state
+
+belongs to MAX17215.
+
+SWI state
+
+belongs to SWI.
+
+Executor state
+
+belongs to Executor.
+
+No module may modify another module's state directly.
+
+# 20 Future Multi-Protocol Support
+
+Current implementation
+
+One active protocol
+
+Future
+
+Multiple protocol implementations
+
+Still one active transaction
+
+# 21. Current Status
 
 Architecture
 
