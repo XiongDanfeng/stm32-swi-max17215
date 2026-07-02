@@ -1,5 +1,8 @@
 #include "swi_capture.h"
 
+
+
+
 void SWI_Capture_Init(SWI_Capture *c)
 {
     c->bit_buffer = 0;
@@ -38,3 +41,5 @@ uint8_t SWI_Capture_ReadByte(SWI_Capture *c)
     c->byte_ready = 0;
     return c->bit_buffer;
 }
+
+
