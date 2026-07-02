@@ -1,7 +1,7 @@
 # STM32 Microsecond Timing Framework
 **Architecture Specification**
 
-Version: 0.1
+Version: 0.2
 
 Author:
 - Xiong Danfeng
@@ -94,6 +94,58 @@ Instead every protocol state schedules the next timestamp.
 | STM32 Hardware               |
 +------------------------------+
 
+4.1. Ownership Diagram
+Application
+      │
+      owns
+      ▼
+MAX17215
+      │
+      owns
+      ▼
+SWI FSM
+      │
+      owns
+      ▼
+Executor
+      │
+      uses
+      ▼
+Timer Backend (singleton)
+
+4.2. State Machine Diagrams
+
+IDLE
+ │
+ ▼
+RESET_LOW
+ │
+ ▼
+RESET_RELEASE
+ │
+ ▼
+WRITE_BIT_LOW
+ │
+ ▼
+WRITE_BIT_RELEASE
+ │
+ ▼
+NEXT_BIT
+ │
+ ├── more bits → WRITE_BIT_LOW
+ │
+ └── done → COMPLETE
+
+ 4.3 Timing Diagrams
+Bus
+────┐      ┌────────────────────────────
+    │      │
+    └──────┘
+    <6µs>
+
+Sample
+───────────────▲────────────────────────
+               15µs
 ---
 
 # 5. Module Responsibilities
