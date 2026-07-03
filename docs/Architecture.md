@@ -8,7 +8,63 @@ Author:
 - OpenAI ChatGPT (Design Review)
 
 ---
+# 0. Folder Structure
+stm32-swi-max17215/
+│
+├── docs/
+│      Architecture.md  //done
+│      Timing.md   // empty
+│      CodingStyle.md    // empty
+|      DesignDecisions.md  // empty
+├── rfc/
+|      RFC-0001-Executor.md  // empty
+│      RFC-0002-SWI.md   // empty
+│      RFC-0003-MAX17215.md    // empty
+├── images/
+│      architecture.drawio   // empty
+│      swi_timing.drawio  // empty
+├── Drivers/
+│      Common/
+│          critical_section.h   // done
+│          critical_section.c   // done
+│      Executor/
+│          executor.h   // done
+│          executor.c  // done
+│
+│      Bus/
+│          bus.h   // empty
+│          bus_stm32f4.c   // empty
+│          bus_mock.cpp   // empty
+│
+│      SWI/
+│          swi.h  // empty
+│          swi.c    // empty
+│
+│      Max17215/
+│          max17215.h   // done
+│          max17215.c   // done
+│
+│      BSP/
+│          tim12_backend.c   // done
+│          tim12_backend.h   // done
+│          executor_backend.h   // done
+│          executor_backend_mock.c  // done
+│          time_utils.h      // done
+├── Tests/
+│          mock_backend.c
+│          battery_test.cpp    // done
+│          executor_test.cpp   // empty
+│          max17215_test.cpp   // empty
+│          swi_test.cpp    // empty
+│          
+│          
+│          
+├── Example/
+│
+└── CMakeLists.txt
 
+
+    
 # 1. Goals
 
 This project provides a reusable framework for implementing deterministic
@@ -25,6 +81,12 @@ The framework is designed around the following principles:
 - SafeRTOS compatible
 - Portable
 - DMA ready
+
+DMA readiness means:
+
+- no protocol depends on CPU timing loops
+- all timing derived from scheduled timestamps
+- bus operations can be replaced by DMA descriptors
 - Zero dynamic memory allocation
 
 The first protocol implemented using this framework is the MAX17215
@@ -173,24 +235,16 @@ Instead every protocol state schedules the next timestamp.
 +------------------------------+
 
 4.1. Ownership Diagram
+
 Application
-      │
-      owns
-      ▼
+  owns
 MAX17215
-      │
-      owns
-      ▼
+  owns
 SWI FSM
-      │
-      owns
-      ▼
+  owns
 Executor
-
-Timer Backend
-
-Singleton
-owned by BSP
+  uses
+Timer Backend (singleton, BSP-owned)
 
 4.2. State Machine Diagrams
 
@@ -229,7 +283,7 @@ Sample
 
 # 5. Module Responsibilities
 
-## MicroExecutor
+## Executor
 
 Responsible for
 
@@ -237,7 +291,7 @@ Responsible for
 - callback execution
 - timer arming
 
-MicroExecutor SHALL NOT
+Executor SHALL NOT
 
 - know GPIO
 - know protocols
@@ -468,21 +522,8 @@ return
 
 # 13. Error Handling
 
-Every public function returns status.
-
-Example
-
-OK
-
-TIMEOUT
-
-CRC_ERROR
-
-BUS_ERROR
-
-INVALID_PARAMETER
-
-a common status type for error model 
+## 13.1 definition:
+a common status type definition for error model :
 
 typedef enum
 {
@@ -501,6 +542,7 @@ typedef enum
     STATUS_INTERNAL_ERROR
 
 } Status;
+## 13.2 rule
 Every module uses this type.
 ---
 
@@ -565,7 +607,32 @@ Drivers/BSP/
 Everything else must compile on Windows.
 ---
 
-# 18. Future Extensions
+# 18. Interrupt ownership rule
+
+Only Timer Backend may define ISR handlers.
+
+All other modules MUST NOT define ISRs.
+
+This prevents future architecture breakage.
+
+# 19. Re-entrancy rule
+
+
+Executor callbacks are non-reentrant.
+
+A new callback shall not be triggered
+until the current callback completes.
+
+# 20. Atomicity Rule
+
+All shared state between ISR and thread context
+must be accessed atomically or within critical sections.
+
+Reason
+
+Prevents race conditions between Executor and Timer Backend.
+
+# 21. Future Extensions
 
 The framework is intended to support
 
@@ -579,7 +646,7 @@ without modification of the executor.
 
 ---
 
-# 19. State Ownership
+# 22. State Ownership
 State belongs to the module that owns it.
 
 Example
@@ -598,7 +665,7 @@ belongs to Executor.
 
 No module may modify another module's state directly.
 
-# 20 Future Multi-Protocol Support
+# 23 Future Multi-Protocol Support
 
 Current implementation
 
@@ -610,7 +677,7 @@ Multiple protocol implementations
 
 Still one active transaction
 
-# 21. Current Status
+# 24. Current Status
 
 Architecture
 
